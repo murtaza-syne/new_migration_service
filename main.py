@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from configs.databse import collection_name
+# from configs.databse import collection_name
 from bg_builder.bg_builder_api import router
 app = FastAPI()
-from configs.databse import collection_name
+# from configs.databse import collection_name
 
 app.include_router(router=router)
 
@@ -81,7 +81,7 @@ document = {
     "cut_wall_bottom": False,
     "save_params": {"param1": "value1"}
 }
-result = collection_name.insert_one(document)
+# result = collection_name.insert_one(document)
 
 
 @app.get("/")

@@ -20,7 +20,8 @@ client = MongoClient(uri)
 try:
     client.admin.command('ping')
     db = client.test_db
-    collection_name = db["test_collection"]
+    current_collection_name = db["test_collection"]
+    version_collection_name = db["version_collection"]
     print("Pinged your deployment. You successfully connected to MongoDB!")
 except Exception as e:
     print(f"Connection failed: {e}")

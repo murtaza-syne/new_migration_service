@@ -15,7 +15,7 @@ from enum import Enum
 import datetime
 # from dataclass_wizard import JSONWizard
 from dataclasses_json import dataclass_json
-from configs.databse import collection_name
+from configs.databse import current_collection_name,version_collection_name
 
 # bgbuilder_redis = redis.Redis(
 #     host="carbgbuilder-001.gmaq4a.0001.use1.cache.amazonaws.com",
@@ -180,6 +180,8 @@ class Bginfo:
     dynamic_logo: int | None = None
     cut_wall_bottom: bool| None = False
     save_params: dict | None = None
+    is_active: bool | None = True
+    version_number: int | None = 1
 
     def __post_init__(self):
         is_360_bg = True
@@ -417,90 +419,37 @@ class BGBuilderAuto:
     #     bgbuilder_redis.set(str(bginfo_obj.bg_id), bginfo_obj.to_json())
     #     return bginfo_obj.to_dict()
     
-    
 
     def add_bg_new(self, data):
-        # old_bg_data = self.get_info(data['bg_id'])
-        # data['created_by'] = old_bg_data.get("created_by", data['last_modified_by'])
-        # data['created_time'] = old_bg_data.get("created_time", data['last_modified_time'])
-        # data['assert_correct'] = True
-        # bginfo_obj = Bginfo.from_dict(data)
-        # bginfo_json = json.loads(bginfo_obj.to_json())
-
-        # collection_name.update_one(
-        #     {'bg_id': bginfo_obj.bg_id},
-        #     {'$set': bginfo_json},
-        #     upsert=True
-        # )
+        current_active_version = current_collection_name.find_one({'bg_id': data['bg_id'], 'is_active': True})
         
-        # return bginfo_obj.to_dict()
-    
+        latest_version = version_collection_name.find_one({'bg_id': data['bg_id']}, sort=[('version_number', -1)])
+        new_version_number = latest_version['version_number'] + 1 if latest_version else 1
 
-        old_bg_data = self.get_info(data['bg_id'])
+        data['version_number'] = new_version_number
+        data['last_modified_time'] = datetime.now()
 
-        if old_bg_data:
-            collection_name.update_one(
-                {'bg_id': data['bg_id'], 'is_active': True},
-                {'$set': {'is_active': False}}
-            )
-            data['created_by'] = old_bg_data.get("created_by", data['last_modified_by'])
-            data['created_time'] = old_bg_data.get("created_time", data['last_modified_time'])
+        if current_active_version:
+            data['created_by'] = current_active_version.get("created_by", data['last_modified_by'])
+            data['created_time'] = current_active_version.get("created_time", data['last_modified_time'])
         else:
             data['created_time'] = datetime.now()
 
-        data['last_modified_time'] = datetime.now()
-        data['assert_correct'] = True
-        data['is_active'] = True 
+        version_collection_name.insert_one(data)
+        data['is_active'] = True
 
-        bginfo_obj = Bginfo.from_dict(data)
+        current_collection_name.update_one(
+            {'bg_id': data['bg_id']},
+            {'$set': data},
+            upsert=True
+        )
 
-        bginfo_json = bginfo_obj.to_dict()
-
-        collection_name.insert_one(bginfo_json)
-
-        return bginfo_obj.to_dict()
+        return data
 
 
-        
-    def update_bg(self,data:Bginfo):
-        # bgbuilder_redis.set(str(data.bg_id), data.to_json())
-        
-        # collection_name.update_one(
-        # {'bg_id': data.bg_id},
-        # {'$set': data.to_dict()},
-        # upsert=True
-        # )
-        # return data.to_dict()
 
-        # current_active_version = collection_name.find_one({'bg_id': data.bg_id, 'is_active': True})
-
-        # if current_active_version:
-        #     # Deactivate the current active version
-        #     collection_name.update_one(
-        #         {'_id': current_active_version['_id']},
-        #         {'$set': {'is_active': False}}
-        #     )
-
-        # # Set new data fields
-
-        # data.created_time = datetime.now()
-        # data.last_modified_time = datetime.now()
-        # data.assert_correct = True
-        # data.is_active = True  # Ensure the new version is active
-
-        # # Insert the new version
-        # collection_name.insert_one(data.to_dict())
-
-        # return data.to_dict()
-
-        latest_active_version = collection_name.find_one({'bg_id': data.bg_id, 'is_active': True})
-        if latest_active_version:
-            collection_name.update_one(
-                {'_id': latest_active_version['_id']},
-                {'$set': {'is_active': False}}
-            )
-
-        latest_version = collection_name.find_one({'bg_id': data.bg_id}, sort=[('version_number', -1)])
+    def update_bg(self, data: Bginfo):
+        latest_version = version_collection_name.find_one({'bg_id': data.bg_id}, sort=[('version_number', -1)])
         if latest_version:
             new_version_number = latest_version.get('version_number', 0) + 1
         else:
@@ -508,35 +457,28 @@ class BGBuilderAuto:
 
         data_dict = data.to_dict()
         data_dict['version_number'] = new_version_number
-        data_dict['is_active'] = True
         data_dict['last_modified_time'] = datetime.now()
 
-        collection_name.update_one(
-            {'bg_id': data.bg_id, 'version_number': new_version_number},
+        version_collection_name.insert_one(data_dict)
+
+        current_collection_name.update_one(
+            {'bg_id': data.bg_id},
             {'$set': data_dict},
             upsert=True
         )
 
         return data_dict
-    
 
     def filter_config(self):
-        # with bgbuilder_redis.pipeline() as pipe:
-        #     for k in bgbuilder_redis.keys():
-        #         pipe.get(k)
-        #     data = pipe.execute()
-        # return [json.loads(x) for x in data if not isinstance(x, int)]
-
-        cursor = collection_name.find({"is_active" : True})
+        cursor = current_collection_name.find({"is_active": True})
         data = [doc for doc in cursor]
         return data
 
-    
     def get_info(self, bg_id):
-        result = collection_name.find_one({'bg_id': bg_id, 'is_active': True})
-     
-        from fastapi.encoders import jsonable_encoder
+        result = current_collection_name.find_one({'bg_id': bg_id, 'is_active': True})
+
         if result:
+            from fastapi.encoders import jsonable_encoder
             result['_id'] = str(result['_id'])
             return jsonable_encoder(result)
         return None
@@ -544,40 +486,21 @@ class BGBuilderAuto:
 
 
     def delete_bg(self, bg_id):
-        # status = bgbuilder_redis.delete(bg_id)
-        # if status == 1:
-        #     return f"Background Delete Success : {bg_id}"
-        # else:
-        #     return f"Background ID Not Present: {bg_id}"
-
-        # result = collection_name.delete_one({'bg_id': bg_id})
-        # if result.deleted_count == 1:
-        #     # self.redis.delete(bg_id)
-        #     return f"Background Delete Success : {bg_id}"
-        # else:
-        #     return f"Background ID Not Present: {bg_id}"
-        
-
-        current_active_version = collection_name.find_one({'bg_id': bg_id, 'is_active': True})
+        current_active_version = current_collection_name.find_one({'bg_id': bg_id, 'is_active': True})
 
         if current_active_version:
-            collection_name.update_one(
+            current_collection_name.update_one(
                 {'_id': current_active_version['_id']},
                 {'$set': {'is_active': False}}
             )
             return f"Background Deactivated: {bg_id}"
         else:
             return f"No active background found with ID: {bg_id}"
-        
-    def bulk_update(bg_data):
+
+    def bulk_update(self, bg_data):
         bg_ids = [data['bg_id'] for data in bg_data]
 
-        collection_name.update_many(
-        {'bg_id': {'$in': bg_ids}, 'is_active': True},
-        {'$set': {'is_active': False}}
-        )
-
-        latest_versions = collection_name.aggregate([
+        latest_versions = version_collection_name.aggregate([
             {'$match': {'bg_id': {'$in': bg_ids}}},
             {'$sort': {'bg_id': 1, 'version_number': -1}},
             {'$group': {'_id': '$bg_id', 'latest_version': {'$first': '$version_number'}}}
@@ -600,12 +523,15 @@ class BGBuilderAuto:
             new_datas.append(new_data)
 
         if new_datas:
-            collection_name.insert_many(new_datas)
+            version_collection_name.insert_many(new_datas)
+            for new_data in new_datas:
+                current_collection_name.update_one(
+                    {'bg_id': new_data['bg_id']},
+                    {'$set': new_data},
+                    upsert=True
+                )
 
         return new_datas
-
-
-
 
 
 def url_tester(url):
