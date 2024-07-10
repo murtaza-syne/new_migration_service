@@ -436,29 +436,57 @@ class BGBuilderAuto:
         # return bginfo_obj.to_dict()
     
 
-        old_bg_data = self.get_info(data['bg_id'])
+        # old_bg_data = self.get_info(data['bg_id'])
 
-        if old_bg_data:
+        # if old_bg_data:
+        #     collection_name.update_one(
+        #         {'bg_id': data['bg_id'], 'is_active': True},
+        #         {'$set': {'is_active': False}}
+        #     )
+        #     data['created_by'] = old_bg_data.get("created_by", data['last_modified_by'])
+        #     data['created_time'] = old_bg_data.get("created_time", data['last_modified_time'])
+        # else:
+        #     data['created_time'] = datetime.now()
+
+        # data['last_modified_time'] = datetime.now()
+        # data['assert_correct'] = True
+        # data['is_active'] = True 
+
+        # bginfo_obj = Bginfo.from_dict(data)
+
+        # bginfo_json = bginfo_obj.to_dict()
+
+        # collection_name.insert_one(bginfo_json)
+
+        # return bginfo_obj.to_dict()
+    
+        current_active_version = self.get_info(data['bg_id'])
+
+        if current_active_version:
             collection_name.update_one(
-                {'bg_id': data['bg_id'], 'is_active': True},
+                {'_id': current_active_version['_id']},
                 {'$set': {'is_active': False}}
             )
-            data['created_by'] = old_bg_data.get("created_by", data['last_modified_by'])
-            data['created_time'] = old_bg_data.get("created_time", data['last_modified_time'])
-        else:
-            data['created_time'] = datetime.now()
 
+        all_versions = list(collection_name.find({'bg_id': data['bg_id']}))
+
+        if all_versions:
+            latest_version = max(all_versions, key=lambda x: x.get('version_number', 0), default=None)
+            new_version_number = latest_version.get('version_number', 0) + 1
+        else:
+            new_version_number = 1 
+
+        data['created_time'] = data.get('created_time', datetime.now())
         data['last_modified_time'] = datetime.now()
         data['assert_correct'] = True
-        data['is_active'] = True 
+        data['version_number'] = new_version_number
+        data['is_active'] = True  
 
-        bginfo_obj = Bginfo.from_dict(data)
+        collection_name.insert_one(data)
 
-        bginfo_json = bginfo_obj.to_dict()
+        return data
+    
 
-        collection_name.insert_one(bginfo_json)
-
-        return bginfo_obj.to_dict()
 
 
         
@@ -472,28 +500,7 @@ class BGBuilderAuto:
         # )
         # return data.to_dict()
 
-        # current_active_version = collection_name.find_one({'bg_id': data.bg_id, 'is_active': True})
-
-        # if current_active_version:
-        #     # Deactivate the current active version
-        #     collection_name.update_one(
-        #         {'_id': current_active_version['_id']},
-        #         {'$set': {'is_active': False}}
-        #     )
-
-        # # Set new data fields
-
-        # data.created_time = datetime.now()
-        # data.last_modified_time = datetime.now()
-        # data.assert_correct = True
-        # data.is_active = True  # Ensure the new version is active
-
-        # # Insert the new version
-        # collection_name.insert_one(data.to_dict())
-
-        # return data.to_dict()
-
-        latest_active_version = collection_name.find_one({'bg_id': data.bg_id, 'is_active': True})
+        latest_active_version = self.get_info(data['bg_id'])
         if latest_active_version:
             collection_name.update_one(
                 {'_id': latest_active_version['_id']},
@@ -558,7 +565,7 @@ class BGBuilderAuto:
         #     return f"Background ID Not Present: {bg_id}"
         
 
-        current_active_version = collection_name.find_one({'bg_id': bg_id, 'is_active': True})
+        current_active_version = self.get_info(bg_id)
 
         if current_active_version:
             collection_name.update_one(
