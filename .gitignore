@@ -1,0 +1,14 @@
+# Ignore environment folders
+myenv/
+
+# Ignore Python bytecode files
+*.pyc
+__pycache__/
+
+# Ignore other environment folders
+env/
+venv/
+
+# Ignore other common files
+.DS_Store
+*.log
