@@ -90,7 +90,8 @@ app.include_router(router=router)
 # )
 
 
-
+from Utils.data_migration import run_migration
+# run_migration()
 @app.get("/")
 def read_root():
     return {"Hello": "World"}

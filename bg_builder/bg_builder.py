@@ -10,13 +10,17 @@ import uuid
 import cv2
 from Utils.error_template import BaseExceptionError
 from Utils.handle_serialization import convert_for_serialization
+from Utils.custom_encoder import custom_jsonable_encoder
 from dataclasses import dataclass
 from typing import Optional, Dict, Union, List, Tuple,Dict
 from enum import Enum
 import datetime
 # from dataclass_wizard import JSONWizard
 from dataclasses_json import dataclass_json
-from configs.databse import current_collection_name,version_collection_name
+from configs.databse import current_collection_name,version_collection_name,client
+from fastapi import HTTPException, status
+from pymongo.errors import PyMongoError
+
 
 # bgbuilder_redis = redis.Redis(
 #     host="carbgbuilder-001.gmaq4a.0001.use1.cache.amazonaws.com",
@@ -29,7 +33,7 @@ from configs.databse import current_collection_name,version_collection_name
 
 
 class Members(Enum):
-    fcbcff64388b3ed69e2fe7cb3bc = "murtaza"
+    fcbcff64388b3ed69e2fe7cb3bc = "Murtaza"
     e73b7bc22f44c87beb34bc7b55a = "AI"
     afe75b642a7adf51f3c7095dc7c = "Afnan"
     c548ef63084f9da5bea73499929 = "Nitin"
@@ -37,7 +41,7 @@ class Members(Enum):
     b2e54d6519a46d298e3a6140b3c = "Jayant"
     c3609810016b14eb8984dbf1eb0 = "Amar"
     e5f278e122c8344cc9515c43710 = "Shreyank"
-    cd7ab3372afb46319cc6f5aec90 = "murtu"
+    cd7ab3372afb46319cc6f5aec90 = "Murtaza"
     cd7ab3372afb46319cc6f5aec77 = "OLD"
     i909033c7f32473da956dc881d7 = "Tech"
     edb314e6aaa4edda1fad2a1c046 = "megha"
@@ -184,233 +188,232 @@ class Bginfo:
     is_active: bool | None = True
     version_number: int | None = 1
 
-    # def __post_init__(self):
-    #     is_360_bg = True
-    #     if isinstance(self.wall_url, list) and len(self.wall_url) > 36:
-    #         is_360_bg = True
+    def __post_init__(self):
+        is_360_bg = True
+        if isinstance(self.wall_url, list) and len(self.wall_url) > 36:
+            is_360_bg = True
 
-    #     if self.assert_correct:
-    #         assert self.window_correction is not None, f"window_correction cannot be None, got {self.window_correction = }"
-    #         assert self.numberplate_config is not None, f"numberplate_config cannot be None, got {self.numberplate_config = }"
-    #         assert self.dynamic_place is not None, f"dynamic_place cannot be None, got {self.dynamic_place = }"
+        if self.assert_correct:
+            assert self.window_correction is not None, f"window_correction cannot be None, got {self.window_correction = }"
+            assert self.numberplate_config is not None, f"numberplate_config cannot be None, got {self.numberplate_config = }"
+            assert self.dynamic_place is not None, f"dynamic_place cannot be None, got {self.dynamic_place = }"
 
-    #         if not is_360_bg:
-    #             assert self.tyre_floor_url is not None, f"tyre_floor_url cannot be None, got {self.tyre_floor_url = }"
-    #             assert self.tyre_floor_alpha is not None, f"tyre_floor_alpha cannot be None, got {self.tyre_floor_alpha = }"
-    #             assert self.int_background_color is not None, f"int_background_color cannot be None, got {self.int_background_color = }"
+            if not is_360_bg:
+                assert self.tyre_floor_url is not None, f"tyre_floor_url cannot be None, got {self.tyre_floor_url = }"
+                assert self.tyre_floor_alpha is not None, f"tyre_floor_alpha cannot be None, got {self.tyre_floor_alpha = }"
+                assert self.int_background_color is not None, f"int_background_color cannot be None, got {self.int_background_color = }"
 
-    #         assert self.glare_intensity is not None, f"glare_intensity cannot be None, got {self.glare_intensity = }"
-    #         assert self.tyre_floor_gamma is not None, f"tyre_floor_gamma cannot be None, got {self.tyre_floor_gamma = }"
-    #         assert self.tilt_correction in [True,False], f"tilt_correction should be boolean, got {self.tilt_correction = }"
+            assert self.glare_intensity is not None, f"glare_intensity cannot be None, got {self.glare_intensity = }"
+            assert self.tyre_floor_gamma is not None, f"tyre_floor_gamma cannot be None, got {self.tyre_floor_gamma = }"
+            assert self.tilt_correction in [True,False], f"tilt_correction should be boolean, got {self.tilt_correction = }"
 
-    #         # assert self.wall_url is not None, f"wall_url cannot be None, got {self.wall_url = }"
-    #         # assert self.floor_url is not None, f"floor_url cannot be None, got {self.floor_url = }"
+            # assert self.wall_url is not None, f"wall_url cannot be None, got {self.wall_url = }"
+            # assert self.floor_url is not None, f"floor_url cannot be None, got {self.floor_url = }"
 
-    #     ### car height
-    #     if isinstance(self.car_height, dict):
-    #         angle_list = self.car_height.keys()
-    #         if not ('default' in angle_list):
-    #             raise BaseExceptionError( f"Background Update Failed : Car height cannot be {self.car_height}.please add all angles and default value. Try Changing it.")
-    #         for angle in angles:
-    #             value = self.car_height[str(angle)] if (
-    #                 str(angle) in angle_list) else self.car_height['default']
-    #             self.car_height[str(angle)] = value
-    #             if isinstance(value, dict):
-    #                 for i in value.keys():
-    #                     v = value[i]
-    #                     if v is None or v <= 0 or v > 1080:
-    #                         raise BaseExceptionError(  f"Background Update Failed :  Car Height cannot be {self.car_height} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
-    #             else:
-    #                 if value is None or value <= 0 or value > 1080:
-    #                     raise BaseExceptionError( f"Background Update Failed :  Car Height cannot be {self.car_height} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
-    #     else:
-    #         if self.car_height is None or self.car_height <= 0 or self.car_height > 1080:
-    #             raise BaseExceptionError( f"Background Update Failed : Car Height cannot be {self.car_height}. Try Changing it.")
+        ### car height
+        if isinstance(self.car_height, dict):
+            angle_list = self.car_height.keys()
+            if not ('default' in angle_list):
+                raise BaseExceptionError( f"Background Update Failed : Car height cannot be {self.car_height}.please add all angles and default value. Try Changing it.")
+            for angle in angles:
+                value = self.car_height[str(angle)] if (
+                    str(angle) in angle_list) else self.car_height['default']
+                self.car_height[str(angle)] = value
+                if isinstance(value, dict):
+                    for i in value.keys():
+                        v = value[i]
+                        if v is None or v <= 0 or v > 1080:
+                            raise BaseExceptionError(  f"Background Update Failed :  Car Height cannot be {self.car_height} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
+                else:
+                    if value is None or value <= 0 or value > 1080:
+                        raise BaseExceptionError( f"Background Update Failed :  Car Height cannot be {self.car_height} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
+        else:
+            if self.car_height is None or self.car_height <= 0 or self.car_height > 1080:
+                raise BaseExceptionError( f"Background Update Failed : Car Height cannot be {self.car_height}. Try Changing it.")
 
-    #     ### car floar specing
-    #     if isinstance(self.car_floor_spacing, dict):
-    #         # new_data["car_floor_spacing"] = new_car_floor_spacing
-    #         angle_list = self.car_floor_spacing.keys()
-    #         if not ('default' in angle_list):
-    #             raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing}.please add all angles and default value. Try Changing it.")
-    #         for angle in angles:
-    #             value = self.car_floor_spacing[str(angle)] if (
-    #                 str(angle) in angle_list) else self.car_floor_spacing['default']
-    #             self.car_floor_spacing[str(angle)] = value
-    #             if isinstance(value, dict):
-    #                 for i in value.keys():
-    #                     v = value[i]
-    #                     if (
-    #                         v is None
-    #                         or v < 0
-    #                         or v > 1080
-    #                         or (1080 - v - ((self.car_height[str(angle)][i] if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height)) <= 0
-    #                     ):
-    #                         raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
-    #             else:
-    #                 if (
-    #                     value is None
-    #                     or value < 0
-    #                     or value > 1080
-    #                     or (1080 - value - ((max(list(self.car_height[str(angle)].values())) if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height)) <= 0
-    #                 ):
-    #                     raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
-    #     else:
-    #         if (
-    #             self.car_floor_spacing is None
-    #             or self.car_floor_spacing < 0
-    #             or self.car_floor_spacing > 1080
-    #             or (1080 - self.car_floor_spacing - (max([max(list(self.car_height[i].values())) if isinstance(self.car_height[i], dict) else self.car_height[i] for i in self.car_height.keys()]) if isinstance(self.car_height, dict) else self.car_height)) <= 0
-    #         ):
-    #             raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing}. Try Changing it.")
+        ### car floar specing
+        if isinstance(self.car_floor_spacing, dict):
+            # new_data["car_floor_spacing"] = new_car_floor_spacing
+            angle_list = self.car_floor_spacing.keys()
+            if not ('default' in angle_list):
+                raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing}.please add all angles and default value. Try Changing it.")
+            for angle in angles:
+                value = self.car_floor_spacing[str(angle)] if (
+                    str(angle) in angle_list) else self.car_floor_spacing['default']
+                self.car_floor_spacing[str(angle)] = value
+                if isinstance(value, dict):
+                    for i in value.keys():
+                        v = value[i]
+                        if (
+                            v is None
+                            or v < 0
+                            or v > 1080
+                            or (1080 - v - ((self.car_height[str(angle)][i] if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height)) <= 0
+                        ):
+                            raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
+                else:
+                    if (
+                        value is None
+                        or value < 0
+                        or value > 1080
+                        or (1080 - value - ((max(list(self.car_height[str(angle)].values())) if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height)) <= 0
+                    ):
+                        raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing} for angle {angle if (str(angle) in angle_list) else 'default'}. Try Changing it.")
+        else:
+            if (
+                self.car_floor_spacing is None
+                or self.car_floor_spacing < 0
+                or self.car_floor_spacing > 1080
+                or (1080 - self.car_floor_spacing - (max([max(list(self.car_height[i].values())) if isinstance(self.car_height[i], dict) else self.car_height[i] for i in self.car_height.keys()]) if isinstance(self.car_height, dict) else self.car_height)) <= 0
+            ):
+                raise BaseExceptionError(  f"Background Update Failed : Car floor spacing cannot be {self.car_floor_spacing}. Try Changing it.")
 
-    #     #####################################################################################################
-    #     # wall_logo
-    #     if all(getattr(self, item) is not None for item in ['logo_width', 'logo_x', 'logo_y', "logo_transparency", 'logo_blendmode']):
-    #         if self.logo_width > 1920:
-    #             raise BaseExceptionError(  f"Background Update Failed : plese add logo_width below 1920. Try Changing it.")
-    #         if self.logo_x > 1920 and self.logo_x <= 0:
-    #             raise BaseExceptionError(  f"Background Update Failed : plese add 0<logo_x < 1920. Try Changing it.")
-    #         if self.logo_y > 1080 and self.logo_y <= 0:
-    #             raise BaseExceptionError(  f"Background Update Failed : plese add 0<logo_y < 1080. Try Changing it.")
-    #         if self.logo_transparency > 1 and self.logo_transparency < 0:
-    #             raise BaseExceptionError(  "Please Add logo_transparency : values should be in between 0 to 1 [-0.99 whould be darker,-0.01 is lighter ] ")
-    #         if self.logo_metallic and self.logo_metallic_depth < 0.01 and self.logo_metallic_depth > 0.05:
-    #             raise BaseExceptionError(  "Please Add logo_metallic_depth : values should be in between 0.01 to 0.05  ")
-    #     elif not all(getattr(self, item) is None for item in ['logo_width', 'logo_x', 'logo_y', "logo_transparency", 'logo_blendmode']):
-    #         raise BaseExceptionError(  f"Background Update Failed : plese add this params {['logo_width','logo_x','logo_y','logo_shadow','logo_transparency','logo_blendmode']}. Try Changing it.")
+        #####################################################################################################
+        # wall_logo
+        if all(getattr(self, item) is not None for item in ['logo_width', 'logo_x', 'logo_y', "logo_transparency", 'logo_blendmode']):
+            if self.logo_width > 1920:
+                raise BaseExceptionError(  f"Background Update Failed : plese add logo_width below 1920. Try Changing it.")
+            if self.logo_x > 1920 and self.logo_x <= 0:
+                raise BaseExceptionError(  f"Background Update Failed : plese add 0<logo_x < 1920. Try Changing it.")
+            if self.logo_y > 1080 and self.logo_y <= 0:
+                raise BaseExceptionError(  f"Background Update Failed : plese add 0<logo_y < 1080. Try Changing it.")
+            if self.logo_transparency > 1 and self.logo_transparency < 0:
+                raise BaseExceptionError(  "Please Add logo_transparency : values should be in between 0 to 1 [-0.99 whould be darker,-0.01 is lighter ] ")
+            if self.logo_metallic and self.logo_metallic_depth < 0.01 and self.logo_metallic_depth > 0.05:
+                raise BaseExceptionError(  "Please Add logo_metallic_depth : values should be in between 0.01 to 0.05  ")
+        elif not all(getattr(self, item) is None for item in ['logo_width', 'logo_x', 'logo_y', "logo_transparency", 'logo_blendmode']):
+            raise BaseExceptionError(  f"Background Update Failed : plese add this params {['logo_width','logo_x','logo_y','logo_shadow','logo_transparency','logo_blendmode']}. Try Changing it.")
 
-    #     if self.floor_url is not None:
-    #         if self.assert_correct:
-    #             assert self.alpha is not None, f"alpha cannot be None when floor_url is not None, got {self.alpha = }"
-    #             assert self.gamma is not None, f"gamma cannot be None when floor_url is not None, got {self.gamma = }"
+        if self.floor_url is not None:
+            if self.assert_correct:
+                assert self.alpha is not None, f"alpha cannot be None when floor_url is not None, got {self.alpha = }"
+                assert self.gamma is not None, f"gamma cannot be None when floor_url is not None, got {self.gamma = }"
 
-    #         if self.alpha is not None:
-    #             if self.alpha > 1 or self.alpha < 0:
-    #                 raise BaseExceptionError(  "Background Update Failed : Alpha should be between 0 and 1")
-    #             if self.gamma > 1 or self.gamma < 0:
-    #                 raise BaseExceptionError(  "Background Update Failed : Gamma should be between 0 and 1")
+            if self.alpha is not None:
+                if self.alpha > 1 or self.alpha < 0:
+                    raise BaseExceptionError(  "Background Update Failed : Alpha should be between 0 and 1")
+                if self.gamma > 1 or self.gamma < 0:
+                    raise BaseExceptionError(  "Background Update Failed : Gamma should be between 0 and 1")
 
-    #     if self.AI_Model in [AIModel.Transparent,AIModel.Hard_Shadow, AIModel.Marble_plus, AIModel.Krypton_plus]:
-    #         if self.wall_url is None and  self.ColorOnColor != True:
-    #             raise BaseExceptionError( "Please Add Background Url")
-    #     # elif self.AI_Model == "Transparent_BG_REFL":
-    #     #     if self.wall_url is None:
-    #     #         raise BaseExceptionError( "Please Add Background Url")
-    #     #     if self.shadow_intensity is None or not (
-    #     #         -1 < self.shadow_intensity < 0
-    #     #     ):
-    #     #         raise BaseExceptionError(
-    #     #             "Please Add shadow intensity : values should be in between 0 to 1 [-0.99 whould be darker,-0.01 is lighter shadow] "
-    #     #         )
-    #     #     if self.shadow_blur is None or not (
-    #     #         0 < self.shadow_blur < 200
-    #     #     ):
-    #     #         raise BaseExceptionError( "Please Add shadow blur :values should be int and  bigger then 0 and less then 200")
-    #     #     if self.reflection_transparency is None or not (
-    #     #         0 < self.reflection_transparency < 1
-    #     #     ):
-    #     #         raise BaseExceptionError( "Please Add reflection transparency :values should be float and in between 0 to 1  [add light_bg true for white bg] ")
-    #     elif self.shadow_intensity is not None:
-    #         if self.shadow_intensity is None or not (
-    #             -1 < self.shadow_intensity < 1
-    #         ):
-    #             raise BaseExceptionError( 
-    #                 "Please Add shadow intensity : values should be in between -1 to 1 [-0.99 whould be darker,+0.99 is lighter shadow]  "
-    #             )
-    #         if self.shadow_len is None or not (
-    #             3 < self.shadow_len < 10
-    #         ):
-    #             raise BaseExceptionError( "Please Add shadow len :values should be in between 3 to 10 [bigger the values less shadow len]")
+        if self.AI_Model in [AIModel.Transparent,AIModel.Hard_Shadow, AIModel.Marble_plus, AIModel.Krypton_plus]:
+            if self.wall_url is None and  self.ColorOnColor != True:
+                raise BaseExceptionError( "Please Add Background Url")
+        # elif self.AI_Model == "Transparent_BG_REFL":
+        #     if self.wall_url is None:
+        #         raise BaseExceptionError( "Please Add Background Url")
+        #     if self.shadow_intensity is None or not (
+        #         -1 < self.shadow_intensity < 0
+        #     ):
+        #         raise BaseExceptionError(
+        #             "Please Add shadow intensity : values should be in between 0 to 1 [-0.99 whould be darker,-0.01 is lighter shadow] "
+        #         )
+        #     if self.shadow_blur is None or not (
+        #         0 < self.shadow_blur < 200
+        #     ):
+        #         raise BaseExceptionError( "Please Add shadow blur :values should be int and  bigger then 0 and less then 200")
+        #     if self.reflection_transparency is None or not (
+        #         0 < self.reflection_transparency < 1
+        #     ):
+        #         raise BaseExceptionError( "Please Add reflection transparency :values should be float and in between 0 to 1  [add light_bg true for white bg] ")
+        elif self.shadow_intensity is not None:
+            if self.shadow_intensity is None or not (
+                -1 < self.shadow_intensity < 1
+            ):
+                raise BaseExceptionError( 
+                    "Please Add shadow intensity : values should be in between -1 to 1 [-0.99 whould be darker,+0.99 is lighter shadow]  "
+                )
+            if self.shadow_len is None or not (
+                3 < self.shadow_len < 10
+            ):
+                raise BaseExceptionError( "Please Add shadow len :values should be in between 3 to 10 [bigger the values less shadow len]")
 
-    #     if self.assert_correct:
-    #         if self.shadow_intensity is None or not (-1 <= self.shadow_intensity <= 0):
-    #             raise BaseExceptionError(
-    #                 "Please Add shadow intensity : values should be in between 0 to 1 [-0.99 whould be darker,-0.01 is lighter shadow] "
-    #             )
-    #         if self.shadow_blur is None or not (0 <= self.shadow_blur < 200):
-    #             raise BaseExceptionError(
-    #                 "Please Add shadow blur :values should be int and  bigger then 0 and less then 200"
-    #             )
+        if self.assert_correct:
+            if self.shadow_intensity is None or not (-1 <= self.shadow_intensity <= 0):
+                raise BaseExceptionError(
+                    "Please Add shadow intensity : values should be in between 0 to 1 [-0.99 whould be darker,-0.01 is lighter shadow] "
+                )
+            if self.shadow_blur is None or not (0 <= self.shadow_blur < 200):
+                raise BaseExceptionError(
+                    "Please Add shadow blur :values should be int and  bigger then 0 and less then 200"
+                )
 
-    #     see_through_transparency = self.see_through_transparency
-    #     if see_through_transparency is not None:
-    #         if not 0 <= see_through_transparency <= 1:
-    #             raise BaseExceptionError( "Background Update failed, values should be between 0 and 1 for see_through_transparency")
+        see_through_transparency = self.see_through_transparency
+        if see_through_transparency is not None:
+            if not 0 <= see_through_transparency <= 1:
+                raise BaseExceptionError( "Background Update failed, values should be between 0 and 1 for see_through_transparency")
 
-    #     if self.output_zoom_percent is not None:
-    #         if isinstance(self.output_zoom_percent, dict):
-    #             angle_list = self.output_zoom_percent.keys()
-    #             if not ('default' in angle_list):
-    #                 raise BaseExceptionError( f"Background Update Failed : Car output Zoom cannot be {self.output_zoom_percent}.please add all angles and default value. Try Changing it.")
-    #             for angle in angles:
-    #                 value = self.output_zoom_percent[str(angle)] if (
-    #                     str(angle) in angle_list) else self.output_zoom_percent['default']
-    #                 self.output_zoom_percent[str(angle)] = value
-    #                 if isinstance(value, dict):
-    #                     for i in value.keys():
-    #                         v = value[i]
-    #                         if not 0 <= v <= 100:
-    #                             raise BaseExceptionError( "Background Update failed, values should be between 0 and 100 for output_zoom_percent")
-    #                         max_allowed_height = ((self.car_height[str(angle)][i] if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height) * \
-    #                             (1+v/100) + ((self.car_floor_spacing[str(angle)][i] if isinstance(self.car_floor_spacing[str(angle)], dict)
-    #                                           else self.car_floor_spacing[str(angle)]) if isinstance(self.car_floor_spacing, dict) else self.car_floor_spacing)
-    #                         if max_allowed_height > 1080:
-    #                             raise BaseExceptionError(f"Background Update failed, zoom percentage is too high! for angle {angle}. Try Changing it.")
-    #                 else:
-    #                     if not 0 <= value <= 100:
-    #                         raise BaseExceptionError( "Background Update failed, values should be between 0 and 100 for output_zoom_percent")
-    #                     max_allowed_height = ((max(list(self.car_height[str(angle)].values())) if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height) * \
-    #                         (1+value/100) + ((max(list(self.car_floor_spacing[str(angle)].values())) if isinstance(self.car_floor_spacing[str(
-    #                             angle)], dict) else self.car_floor_spacing[str(angle)]) if isinstance(self.car_floor_spacing, dict) else self.car_floor_spacing)
-    #                     if max_allowed_height > 1080:
-    #                         raise BaseExceptionError( f"Background Update failed, zoom percentage is too high! for angle {angle}. Try Changing it.")
-    #         else:
-    #             if not 0 <= self.output_zoom_percent <= 100:
-    #                 raise BaseExceptionError( "Background Update failed, values should be between 0 and 100 for output_zoom_percent")
-    #             max_allowed_height = (max([max(list(self.car_height[i].values())) if isinstance(self.car_height[i], dict) else self.car_height[i] for i in self.car_height.keys()]) if isinstance(self.car_height, dict) else self.car_height) * \
-    #                 (1+self.output_zoom_percent/100) + (max([max(list(self.car_floor_spacing[i].values())) if isinstance(self.car_floor_spacing[i], dict) else self.car_floor_spacing[i]
-    #                                                     for i in self.car_floor_spacing.keys()]) if isinstance(self.car_floor_spacing, dict) else self.car_floor_spacing)
-    #             if max_allowed_height > 1080:
-    #                 raise BaseExceptionError(  "Background Update failed, zoom percentage is too high!")
-    #     if self.crop_margin is not None:
-    #         if isinstance(self.crop_margin, dict):
-    #             crop_margin_angles = self.crop_margin.keys()
-    #             if 'default' not in crop_margin_angles:
-    #                 raise BaseExceptionError(   f"Background Update Failed : crop_margin cannot be {self.crop_margin}.please add all angles and default value. Try Changing it.")
-    #             for angle in angles:
-    #                 value = self.crop_margin[str(angle)] if (
-    #                     str(angle) in crop_margin_angles) else self.crop_margin['default']
-    #                 self.crop_margin[str(angle)] = value
+        if self.output_zoom_percent is not None:
+            if isinstance(self.output_zoom_percent, dict):
+                angle_list = self.output_zoom_percent.keys()
+                if not ('default' in angle_list):
+                    raise BaseExceptionError( f"Background Update Failed : Car output Zoom cannot be {self.output_zoom_percent}.please add all angles and default value. Try Changing it.")
+                for angle in angles:
+                    value = self.output_zoom_percent[str(angle)] if (
+                        str(angle) in angle_list) else self.output_zoom_percent['default']
+                    self.output_zoom_percent[str(angle)] = value
+                    if isinstance(value, dict):
+                        for i in value.keys():
+                            v = value[i]
+                            if not 0 <= v <= 100:
+                                raise BaseExceptionError( "Background Update failed, values should be between 0 and 100 for output_zoom_percent")
+                            max_allowed_height = ((self.car_height[str(angle)][i] if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height) * \
+                                (1+v/100) + ((self.car_floor_spacing[str(angle)][i] if isinstance(self.car_floor_spacing[str(angle)], dict)
+                                              else self.car_floor_spacing[str(angle)]) if isinstance(self.car_floor_spacing, dict) else self.car_floor_spacing)
+                            if max_allowed_height > 1080:
+                                raise BaseExceptionError(f"Background Update failed, zoom percentage is too high! for angle {angle}. Try Changing it.")
+                    else:
+                        if not 0 <= value <= 100:
+                            raise BaseExceptionError( "Background Update failed, values should be between 0 and 100 for output_zoom_percent")
+                        max_allowed_height = ((max(list(self.car_height[str(angle)].values())) if isinstance(self.car_height[str(angle)], dict) else self.car_height[str(angle)]) if isinstance(self.car_height, dict) else self.car_height) * \
+                            (1+value/100) + ((max(list(self.car_floor_spacing[str(angle)].values())) if isinstance(self.car_floor_spacing[str(
+                                angle)], dict) else self.car_floor_spacing[str(angle)]) if isinstance(self.car_floor_spacing, dict) else self.car_floor_spacing)
+                        if max_allowed_height > 1080:
+                            raise BaseExceptionError( f"Background Update failed, zoom percentage is too high! for angle {angle}. Try Changing it.")
+            else:
+                if not 0 <= self.output_zoom_percent <= 100:
+                    raise BaseExceptionError( "Background Update failed, values should be between 0 and 100 for output_zoom_percent")
+                max_allowed_height = (max([max(list(self.car_height[i].values())) if isinstance(self.car_height[i], dict) else self.car_height[i] for i in self.car_height.keys()]) if isinstance(self.car_height, dict) else self.car_height) * \
+                    (1+self.output_zoom_percent/100) + (max([max(list(self.car_floor_spacing[i].values())) if isinstance(self.car_floor_spacing[i], dict) else self.car_floor_spacing[i]
+                                                        for i in self.car_floor_spacing.keys()]) if isinstance(self.car_floor_spacing, dict) else self.car_floor_spacing)
+                if max_allowed_height > 1080:
+                    raise BaseExceptionError(  "Background Update failed, zoom percentage is too high!")
+        if self.crop_margin is not None:
+            if isinstance(self.crop_margin, dict):
+                crop_margin_angles = self.crop_margin.keys()
+                if 'default' not in crop_margin_angles:
+                    raise BaseExceptionError(   f"Background Update Failed : crop_margin cannot be {self.crop_margin}.please add all angles and default value. Try Changing it.")
+                for angle in angles:
+                    value = self.crop_margin[str(angle)] if (
+                        str(angle) in crop_margin_angles) else self.crop_margin['default']
+                    self.crop_margin[str(angle)] = value
 
-    #     if self.glare_intensity < 0 or self.glare_intensity > 100:
-    #         raise BaseExceptionError(  "Background Update Failed : glare_intensity should be between 0 and 100")    
-    #     if self.dynamic_place>0:
-    #         if self.wall_url is None:
-    #             raise BaseExceptionError(   "Can't enable dynamic_place without wall_url, please upload.")
-    #         if self.floor_url is None:
-    #             raise BaseExceptionError(   "Can't enable dynamic_place without floor_url, please upload.")
-    #         if self.assert_correct:
-    #             assert self.front_angle_horizon_pct is not None, f"front_angle_horizon_pct cannot be None when dynamic_place is True, got {self.front_angle_horizon_pct = }"
-    #             assert self.dynamic_preserve_wall is not None, f"dynamic_preserve_wall cannot be None when dynamic_place is True, got {self.dynamic_preserve_wall = }"
-    #             assert self.tyre_horizon_offset is not None, f"tyre_horizon_offset cannot be None when dynamic_place is True, got {self.tyre_horizon_offset = }"
+        if self.glare_intensity < 0 or self.glare_intensity > 100:
+            raise BaseExceptionError(  "Background Update Failed : glare_intensity should be between 0 and 100")    
+        if self.dynamic_place>0:
+            if self.wall_url is None:
+                raise BaseExceptionError(   "Can't enable dynamic_place without wall_url, please upload.")
+            if self.floor_url is None:
+                raise BaseExceptionError(   "Can't enable dynamic_place without floor_url, please upload.")
+            if self.assert_correct:
+                assert self.front_angle_horizon_pct is not None, f"front_angle_horizon_pct cannot be None when dynamic_place is True, got {self.front_angle_horizon_pct = }"
+                assert self.dynamic_preserve_wall is not None, f"dynamic_preserve_wall cannot be None when dynamic_place is True, got {self.dynamic_preserve_wall = }"
+                assert self.tyre_horizon_offset is not None, f"tyre_horizon_offset cannot be None when dynamic_place is True, got {self.tyre_horizon_offset = }"
 
-    #     if not 80>=self.front_angle_horizon_pct>=20:
-    #         raise BaseExceptionError( "front_angle_horizon_pct should be between 20 and 80.")
+        if not 80>=self.front_angle_horizon_pct>=20:
+            raise BaseExceptionError( "front_angle_horizon_pct should be between 20 and 80.")
 
 
 #########################
 def check_username_password(uname)-> Members:
     try:
-        member = "Murtaza" #Members[uname]
+        member = Members[uname]
     except:
         raise BaseExceptionError("username is not listed")
     
     return member
 
-
-
 class BGBuilderAuto:
+
     # def add_bg_new(self,data):
     #     old_bg_data = self.get_info(data['bg_id'])
     #     data['created_by'] = old_bg_data.get("created_by",data['last_modified_by'])
@@ -422,66 +425,82 @@ class BGBuilderAuto:
     
 
     def add_bg_new(self, data):
-        current_active_version = current_collection_name.find_one({'bg_id': data['bg_id'], 'is_active': True})
-        
-        latest_version = version_collection_name.find_one({'bg_id': data['bg_id']}, sort=[('version_number', -1)])
-        new_version_number = latest_version['version_number'] + 1 if latest_version else 1
 
-        data['version_number'] = new_version_number
-        data['last_modified_time'] = datetime.datetime.now()
+        with client.start_session() as session:
+            try:
+                with session.start_transaction():
+                    current_active_version = current_collection_name.find_one({'bg_id': data['bg_id'], 'is_active': True})
 
-        if current_active_version:
-            data['created_by'] = current_active_version.get("created_by", data['last_modified_by'])
-            data['created_time'] = current_active_version.get("created_time", data['last_modified_time'])
-        else:
-            data['created_time'] = datetime.datetime.now()
+                    new_version_number = current_active_version['version_number'] + 1 if current_active_version else 1
 
-        version_data = data.copy()
-        version_data.pop("is_active",None)
-        version_collection_name.insert_one(version_data)
-        data['is_active'] = True
-        data_for_update = data.copy()
-        data_for_update.pop('_id', None)
+                    if new_version_number>1:
+                        version_data = current_active_version.copy()
+                        for key,value in data.items():
+                            if value:
+                                version_data[key] = value
 
-        current_collection_name.update_one(
-            {'bg_id': data['bg_id']},
-            {'$set': data_for_update},
-            upsert=True
-        )
-        if data.get("_id"):
-            data['_id'] = str(data.get("_id"))
+                        version_data.pop("is_active",None)
+                        version_data.pop("_id",None)
+                        version_collection_name.insert_one(version_data,session= session)
 
-        data = convert_for_serialization(data)
-        return data
+                    data['version_number'] = new_version_number
+                    data['last_modified_time'] = datetime.datetime.now()
+
+                    if current_active_version:
+                        data['created_by'] = current_active_version.get("created_by", data['last_modified_by'])
+                        data['created_time'] = current_active_version.get("created_time", data['last_modified_time'])
+                    else:
+                        data['created_time'] = datetime.datetime.now()
+
+                    data['is_active'] = True
+                    data_for_update = data.copy()
+                    data_for_update.pop('_id', None)
+
+                    current_collection_name.update_one(
+                        {'bg_id': data['bg_id']},
+                        {'$set': data_for_update},
+                        upsert=True
+                    ,session= session)
+
+                    return data
+                
+            except PyMongoError as e:
+                session.abort_transaction()
+                raise HTTPException(status_code=500, detail=str(e))
+
 
 
 
     def update_bg(self, data: Bginfo):
-        latest_version = version_collection_name.find_one({'bg_id': data.bg_id}, sort=[('version_number', -1)])
-        if latest_version:
-            new_version_number = latest_version.get('version_number', 0) + 1
-        else:
-            new_version_number = 1
 
-        data_dict = data.to_dict()
-        data_dict['last_modified_time'] = datetime.datetime.now()
-        data_dict['version_number'] = new_version_number
-        data_dict = convert_for_serialization(data_dict)
-        version_collection_name.insert_one(data_dict)
-        data_dict_copy = data_dict.copy()
-        data_dict_copy.pop('_id', None)
+        with client.start_session() as session:
+            try:
+                with session.start_transaction():
 
+                    latest_version = current_collection_name.find_one({'bg_id': data.bg_id, "is_active": True})
 
-        current_collection_name.update_one(
-            {'bg_id': data.bg_id},
-            {'$set': data_dict_copy},
-            upsert=True
-        )
-        if data_dict.get("_id"):
-            data_dict['_id'] = str(data_dict['_id'])
+                    if not latest_version:
+                        raise ValueError(f"No active record found with bg_id: {data.bg_id}")
+                    
+                    data_dict = data.to_dict()
+                    data_dict['last_modified_time'] = datetime.datetime.now()
+                    latest_version.pop("_id")
+                    data_dict = custom_jsonable_encoder(data_dict)
+                    version_collection_name.insert_one(latest_version,session=session)
+                    data_dict["version_number"]= latest_version.get("version_number", 0) + 1
 
+                    current_collection_name.update_one(
+                        {'bg_id': data.bg_id},
+                        {'$set': data_dict},
+                        upsert=True
+                    ,session=session)
 
-        return data_dict
+                    return data_dict
+                
+            except PyMongoError as e:
+                session.abort_transaction()
+                raise HTTPException(status_code=500, detail=str(e))
+
 
     def filter_config(self):
         cursor = current_collection_name.find({"is_active": True})
@@ -490,84 +509,100 @@ class BGBuilderAuto:
 
     def get_info(self, bg_id):
         result = current_collection_name.find_one({'bg_id': bg_id, 'is_active': True})
-
         if result:
-            from fastapi.encoders import jsonable_encoder
-            result['_id'] = str(result['_id'])
-            return jsonable_encoder(result)
+            return result
         return None
     
 
 
     def delete_bg(self, bg_id):
-        current_active_version = current_collection_name.find_one({'bg_id': bg_id, 'is_active': True})
 
-        if current_active_version:
-            current_collection_name.update_one(
-                {'_id': current_active_version['_id']},
-                {'$set': {'is_active': False}}
-            )
-            return f"Background Deactivated: {bg_id}"
-        else:
-            return f"No active background found with ID: {bg_id}"
+        with client.start_session() as session:
+            try:
+                with session.start_transaction():
+                    current_active_version = current_collection_name.find_one({'bg_id': bg_id, 'is_active': True})
 
-    def bulk_update(self, bg_data):
-        bg_ids = [data['bg_id'] for data in bg_data]
+                    if current_active_version:
+                        current_collection_name.update_one(
+                            {'_id': current_active_version['_id']},
+                            {'$set': {'is_active': False}}
+                        ,session=session)
+                        return f"Background Deactivated: {bg_id}"
+                    else:
+                        return f"No active background found with ID: {bg_id}"
+                    
+            except PyMongoError as e:
+                session.abort_transaction()
+                raise HTTPException(status_code=500, detail=str(e))
 
-        latest_versions = version_collection_name.aggregate([
-            {'$match': {'bg_id': {'$in': bg_ids}}},
-            {'$sort': {'bg_id': 1, 'version_number': -1}},
-            {'$group': {'_id': '$bg_id', 'latest_version': {'$first': '$version_number'}}}
-        ])
+    def bulk_update(self, bg_data,username):
 
-        latest_versions_dict = {doc['_id']: doc['latest_version'] for doc in latest_versions}
+        with client.start_session() as session:
+            try:
+                with session.start_transaction():
+                    bg_ids = [data['bg_id'] for data in bg_data]
 
-        new_datas = []
-        for data in bg_data:
-            bg_id = data['bg_id']
-            current_data = current_collection_name.find_one({'bg_id': bg_id})
+                    current_versions = current_collection_name.find({'bg_id': {'$in': bg_ids}})
+                    current_versions_dict = {doc['bg_id']: doc for doc in current_versions}
 
-            if current_data:
-                for key, value in data.items():
-                    if value is not None:
-                        current_data[key] = value
-                current_data['last_modified_time'] = datetime.datetime.now()
-            else:
-                current_data = {
-                    **data,
-                    'created_at': datetime.now(),
-                    'last_modified_time': datetime.datetime.now(),
-                }
-            
-            new_version_number = latest_versions_dict.get(bg_id, 0) + 1
+                    new_datas = []
+                    versioned_datas = []
+                    inactive_bg_ids = []
 
-            new_data = {
-                **current_data,
-                'version_number': new_version_number,
-                'is_active': True
-            }
-            
-            new_datas.append(new_data)
+                    for data in bg_data:
+                        bg_id = data['bg_id']
+                        current_data = current_versions_dict.get(bg_id)
 
-        if new_datas:
-            new_datas = [convert_for_serialization(data) for data in new_datas]
-            versioned_new_datas = []
-            for single_data in new_datas:
-                version_data_copy = single_data.copy()
-                version_data_copy.pop("is_active", None)
-                versioned_new_datas.append(version_data_copy)
+                        if current_data and current_data.get('is_active', False):
+                            versioned_datas.append(current_data.copy())
 
-            version_collection_name.insert_many(versioned_new_datas)
-            for new_data in new_datas:
-                new_data_copy = new_data.copy()
-                new_data_copy.pop("_id", None)
-                current_collection_name.update_one(
-                    {'bg_id': new_data['bg_id']},
-                    {'$set': new_data_copy},
-                    upsert=True
-                )
+                            for key, value in data.items():
+                                if value is not None:
+                                    current_data[key] = value
+                            current_data['last_modified_time'] = datetime.datetime.now()
+                            current_data['version_number'] = current_data.get('version_number', 0) + 1
+                            current_data['last_modified_by'] = username
 
-        return new_datas
+                            new_data = current_data.copy()
+                            new_datas.append(new_data)
+                        else:
+                            inactive_bg_ids.append(bg_id)
+
+                    if inactive_bg_ids:
+                        raise HTTPException(status_code=400, detail=f"The following bg_id(s) are inactive: {', '.join(inactive_bg_ids)}")
+
+                    if new_datas:
+
+                        new_datas = [Bginfo.from_dict(data).to_dict() for data in new_datas]
+                        versioned_datas = [Bginfo.from_dict(data).to_dict() for data in versioned_datas]
+
+                        new_datas = custom_jsonable_encoder(new_datas)
+                        versioned_datas = custom_jsonable_encoder(versioned_datas)
+
+
+                        if versioned_datas:
+                            for version_data in versioned_datas:
+                                version_data.pop("is_active",None)
+                                version_data.pop("_id",None)
+                            
+                            version_collection_name.insert_many(versioned_datas,session=session)
+
+                        for new_data in new_datas:
+                            new_data_copy = new_data.copy()
+                            new_data_copy.pop('_id', None)
+                            current_collection_name.update_one(
+                                {'bg_id': new_data['bg_id']},
+                                {'$set': new_data_copy},
+                                upsert=True
+                            ,session=session)
+                    
+                    return new_datas
+                
+            except PyMongoError as e:
+                session.abort_transaction()
+                raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 def url_tester(url):

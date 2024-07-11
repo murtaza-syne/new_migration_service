@@ -1,8 +1,9 @@
 import redis
-from configs.databse import collection_name
+from configs.databse import current_collection_name
 import json
+import datetime
 
-# Connect to Redis
+
 bgbuilder_redis = redis.Redis(
     host="carbgbuilder-001.gmaq4a.0001.use1.cache.amazonaws.com",
     port=6379,
@@ -10,12 +11,24 @@ bgbuilder_redis = redis.Redis(
     decode_responses=True,
 )
 
-for key in bgbuilder_redis.scan_iter('*'):
-    value = bgbuilder_redis.get(key)
-    value_dict = json.loads(value.decode('utf-8'))  # Assuming the value is a JSON string
-    value_dict['_id'] = key.decode('utf-8')
-    value_dict["is_active"] = True
-    value_dict["version_number"] = 1
-    collection_name.insert_one(value_dict)
 
-print("Data migration completed.")
+def run_migration():
+    for key in bgbuilder_redis.scan_iter('*'):
+        value = bgbuilder_redis.get(key)
+        value = json.loads(value)
+        value["is_active"] = True
+        value["version_number"] = 1
+
+        if value.get("created_time"):
+            value['created_time'] = datetime.datetime.fromtimestamp(value['created_time'])
+        if value.get("last_modified_time"):
+            value['last_modified_time'] = datetime.datetime.fromtimestamp(value['last_modified_time'])
+        current_collection_name.insert_one(value)
+
+    
+    print("Data migration completed.")
+
+
+
+
+
