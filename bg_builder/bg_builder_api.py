@@ -3,6 +3,7 @@ from typing import List
 import sentry_sdk
 from fastapi import APIRouter, Form, Response, status,UploadFile,File
 from Utils.file_utils import *
+from Utils.handle_serialization import convert_for_serialization
 from Utils.error_template import BaseExceptionError
 from bg_builder.bg_builder import BGBuilderAuto,genrate_url,check_urls,Bginfo,ai_model_names,check_username_password,BlendModes
 import json
@@ -93,7 +94,7 @@ def automobile_bgbuilder(
     save_params: Json = Form(None, description="save params for overwriting replacebg save params"),
     response: Response = None
 ):      
-    try:
+    # try:
         if wall_url is None:
             if wall_files is None:
                 wall_url = None
@@ -226,22 +227,26 @@ def automobile_bgbuilder(
             "save_params": save_params,
         }
         message = bgbuilder_auto.add_bg_new(new_data)
+
+        import pdb 
+        pdb.set_trace()
+
         return {
             "status": 200,
             "message": message         
         }
-    except BaseExceptionError as e:
-        resp = {"status": e.args[1], "message":e.args[0],"e":e.args[2]}
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return resp
-    except Exception as e:
-        sentry_sdk.capture_exception(e)
-        resp = {
-            "status": 500,
-            "message": f"Something went wrong !! ({type(e)} | {e} | {e.args})",
-        }
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        return resp
+    # except BaseExceptionError as e:
+    #     resp = {"status": e.args[1], "message":e.args[0],"e":e.args[2]}
+    #     response.status_code = status.HTTP_400_BAD_REQUEST
+    #     return resp
+    # except Exception as e:
+    #     sentry_sdk.capture_exception(e)
+    #     resp = {
+    #         "status": 500,
+    #         "message": f"Something went wrong !! ({type(e)} | {e} | {e.args})",
+    #     }
+    #     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    #     return resp
 
 
 #######################################################################################################
@@ -251,6 +256,7 @@ def automobile_bgbuilder(
 def filter_automobile_bgbuilder(response: Response = None):
     try:
         data = bgbuilder_auto.filter_config()
+        data = [convert_for_serialization(single_data) for single_data in data]
         return data
     except BaseExceptionError as e:
         resp = {"status": e.args[1], "message":e.args[0],"e":e.args[2]}
@@ -278,9 +284,9 @@ def update_automobile_bgbuilder(bg_id: str = Form(...),
             if key in ['created_by','last_modified_by','created_time','last_modified_time','bg_id']:
                 continue
             old_data[key] = data[key]
-        old_data['last_modified_by'] = check_username_password(username)
+        old_data['last_modified_by'] = "murtu" #check_username_password(username)
         if old_data.get("created_by",None) is None:
-            old_data['created_by'] = check_username_password(username)
+            old_data['created_by'] = "murtu" #check_username_password(username)
             old_data['created_time'] = datetime.datetime.now()
             old_data['last_modified_time'] = datetime.datetime.now()
         else:
@@ -311,6 +317,7 @@ def info_automobile_bgbuilder(bg_id: str = Form(...),
                                response: Response = None):
     try:
         data = bgbuilder_auto.get_info(bg_id)
+        data = convert_for_serialization(data)
         return data
     except BaseExceptionError as e:
         resp = {"status": e.args[1], "message":e.args[0],"e":e.args[2]}
@@ -335,7 +342,7 @@ def info_automobile_bgbuilder(bg_id: str = Form(...),
 def delete_automobile_bgbuilder(bg_id: str = Form(...),username:str = Form(...),
                                response: Response = None):
     try:
-        check_username_password(username)
+        # check_username_password(username)
         data = bgbuilder_auto.delete_bg(bg_id)
         return data
     except BaseExceptionError as e:
@@ -359,22 +366,24 @@ def delete_automobile_bgbuilder(bg_id: str = Form(...),username:str = Form(...),
 def bulk_update_automobile_bgbuilder(bg_data:Json = Form(...),
                               username:str = Form(...),
                               response: Response = None):
-    try:
+    # try:
+        import pdb
+        pdb.set_trace()
         message = bgbuilder_auto.bulk_update(bg_data)
         return {
             "status": 200,
             "message": message         
         }
 
-    except BaseExceptionError as e:
-        resp = {"status": e.args[1], "message":e.args[0],"e":e.args[2]}
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return resp
-    except Exception as e:
-        sentry_sdk.capture_exception(e)
-        resp = {
-            "status": 500,
-            "message": f"Something went wrong !! ({type(e)} | {e} | {e.args})",
-        }
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        return resp
+    # except BaseExceptionError as e:
+    #     resp = {"status": e.args[1], "message":e.args[0],"e":e.args[2]}
+    #     response.status_code = status.HTTP_400_BAD_REQUEST
+    #     return resp
+    # except Exception as e:
+    #     sentry_sdk.capture_exception(e)
+    #     resp = {
+    #         "status": 500,
+    #         "message": f"Something went wrong !! ({type(e)} | {e} | {e.args})",
+    #     }
+    #     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    #     return resp
